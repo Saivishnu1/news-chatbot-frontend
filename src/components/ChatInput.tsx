@@ -8,26 +8,35 @@ interface ChatInputProps {
 const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
   const [inputValue, setInputValue] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [isComposing, setIsComposing] = useState(false);
 
   useEffect(() => {
     // Focus the input on component mount
     inputRef.current?.focus();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = React.useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    if (inputValue.trim()) {
-      onSendMessage(inputValue);
-      setInputValue('');
+    if (inputValue.trim() && !isComposing) {
+      const message = inputValue;
+      setInputValue(''); // Clear input immediately
+      // Use requestAnimationFrame to ensure UI updates before sending
+      requestAnimationFrame(() => {
+        onSendMessage(message);
+      });
     }
-  };
+  }, [inputValue, isComposing, onSendMessage]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const handleKeyDown = React.useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
       e.preventDefault();
       handleSubmit(e);
     }
-  };
+  }, [handleSubmit, isComposing]);
+
+  const handleChange = React.useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputValue(e.target.value);
+  }, []);
 
   return (
     <div className="p-4 border-t border-gray-200 bg-white">
@@ -36,14 +45,19 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
           <textarea
             ref={inputRef}
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={handleChange}
             onKeyDown={handleKeyDown}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={() => setIsComposing(false)}
             placeholder="Type a message..."
+
             className="w-full p-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all"
             rows={1}
             style={{
-              minHeight: '50px',
-              maxHeight: '150px',
+              minHeight: '44px',
+              maxHeight: '200px',
+              caretColor: 'auto',
+              WebkitAppearance: 'none',
               height: 'auto',
             }}
           />

@@ -1,112 +1,182 @@
-import React, { useState, useRef, useEffect } from 'react';
-import MessageList from './MessageList';
-import ChatInput from './ChatInput';
-import Header from './Header';
+import React, { useState, useRef, useEffect } from "react";
+import MessageList from "./MessageList";
+import ChatInput from "./ChatInput";
+import Header from "./Header";
 
 export type Message = {
   id: string;
   text: string;
-  sender: 'user' | 'bot';
+  sender: "user" | "bot";
   timestamp: Date;
+  context?: Array<{
+    title: string;
+    url: string;
+    description: string;
+  }>;
 };
 
 const ChatContainer: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: '1',
-      text: 'Hello! How can I help you today?',
-      sender: 'bot',
+      id: "1",
+      text: "Hello! How can I help you today?",
+      sender: "bot",
       timestamp: new Date(),
+      context: [],
     },
   ]);
   const [isTyping, setIsTyping] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Fetch session ID and chat history from backend when component loads
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    async function initializeChat() {
+      try {
+        // Try to get existing session from localStorage
+        const storedSessionId = localStorage.getItem('chatSessionId');
+        
+        if (storedSessionId) {
+          // If we have a stored session, fetch its history
+          setSessionId(storedSessionId);
+          const historyResponse = await fetch(`http://localhost:8000/api/session/chat_history/${storedSessionId}`);
+          const historyData = await historyResponse.json();
+          
+          if (historyData.messages && historyData.messages.length > 0) {
+            const formattedMessages = historyData.messages.map((msg: any) => ({
+              id: Math.random().toString(),
+              text: msg.content,
+              sender: msg.role === 'assistant' ? 'bot' : 'user',
+              timestamp: new Date(),
+              context: [],
+            }));
+            setMessages(formattedMessages);
+            return;
+          }
+        }
+        
+        // If no stored session or no history, create new session
+        const response = await fetch("http://localhost:8000/api/session/new_session/");
+        const data = await response.json();
+        setSessionId(data.session_id);
+        localStorage.setItem('chatSessionId', data.session_id);
+      } catch (error) {
+        console.error("Error initializing chat:", error);
+      }
+    }
+    initializeChat();
+  }, []);
+
+  // Remove the old scroll effect since it's now handled in MessageList
+  useEffect(() => {
+    // Add a small delay to ensure the DOM has updated
+    const timer = setTimeout(() => {
+      const chatContainer = document.querySelector('.overflow-y-auto');
+      if (chatContainer) {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
+    }, 100);
+    return () => clearTimeout(timer);
   }, [messages]);
 
-  const handleSendMessage = (text: string) => {
-    if (!text.trim()) return;
+  const handleSendMessage = async (text: string) => {
+    if (!text.trim() || !sessionId) return;
     
-    // Add user message
+    // Save message to backend
+    try {
+      await fetch(`http://localhost:8000/api/session/chat_message/${sessionId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          role: 'user',
+          content: text,
+        }),
+      });
+    } catch (error) {
+      console.error('Error saving message:', error);
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       text,
-      sender: 'user',
+      sender: "user",
       timestamp: new Date(),
     };
-    
+
     setMessages((prev) => [...prev, userMessage]);
-    
-    // Simulate bot typing
     setIsTyping(true);
-    
-    // Simulate bot response after a delay
-    setTimeout(() => {
+
+    try {
+      const response = await fetch("http://localhost:8000/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, session_id: sessionId }),
+      });
+
+      const data = await response.json();
+
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: generateSmartResponse(text.toLowerCase()),
-        sender: 'bot',
+        text: data.answer || "Oops! No response available.",
+        sender: "bot",
         timestamp: new Date(),
+        context: data.news_context || [],
       };
-      
+
+      // Save bot message to backend
+      try {
+        await fetch(`http://localhost:8000/api/session/chat_message/${sessionId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            role: 'assistant',
+            content: data.answer || "Oops! No response available.",
+          }),
+        });
+      } catch (error) {
+        console.error('Error saving bot message:', error);
+      }
+
       setMessages((prev) => [...prev, botMessage]);
       setIsTyping(false);
-    }, 1500);
+    } catch (error) {
+      console.error("API request failed:", error);
+      setIsTyping(false);
+    }
   };
 
-  const generateSmartResponse = (text: string): string => {
-    // Simple keyword-based response system
-    if (text.includes('hello') || text.includes('hi')) {
-      return "Hello! How can I assist you today?";
-    }
-    
-    if (text.includes('help')) {
-      return "I'm here to help! What specific assistance do you need?";
-    }
-    
-    if (text.includes('weather')) {
-      return "I'm sorry, I don't have access to real-time weather data. You would need to integrate a weather API for that functionality.";
-    }
-    
-    if (text.includes('name')) {
-      return "I'm a chat assistant. You can call me Bot!";
-    }
-    
-    if (text.includes('bye') || text.includes('goodbye')) {
-      return "Goodbye! Have a great day!";
-    }
-    
-    if (text.includes('thank')) {
-      return "You're welcome! Is there anything else I can help you with?";
-    }
-    
-    if (text.includes('how are you')) {
-      return "I'm functioning well, thank you for asking! How can I assist you today?";
-    }
+  const handleReset = async () => {
+    if (!sessionId) return;
 
-    // Default responses for unknown inputs
-    const defaultResponses = [
-      "That's an interesting point. Could you elaborate more?",
-      "I understand. What specific aspects would you like to explore?",
-      "Tell me more about that.",
-      "I see. How can I help you with this topic?",
-      "Interesting perspective. What made you think about this?"
-    ];
-    
-    return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
-  };
+    try {
+      // Call backend to reset chat history
+      await fetch(`http://localhost:8000/api/session/reset/${sessionId}`, {
+        method: 'POST',
+      });
 
-  const handleReset = () => {
-    setMessages([
-      {
-        id: '1',
-        text: 'Hello! How can I help you today?',
-        sender: 'bot',
-        timestamp: new Date(),
-      },
-    ]);
+      // Reset frontend state
+      setMessages([
+        {
+          id: "1",
+          text: "Hello! How can I help you today?",
+          sender: "bot",
+          timestamp: new Date(),
+          context: [],
+        },
+      ]);
+
+      // Create new session
+      const response = await fetch("http://localhost:8000/api/session/new_session/");
+      const data = await response.json();
+      setSessionId(data.session_id);
+      localStorage.setItem('chatSessionId', data.session_id);
+    } catch (error) {
+      console.error('Error resetting chat:', error);
+    }
   };
 
   return (
