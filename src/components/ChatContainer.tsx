@@ -39,7 +39,7 @@ const ChatContainer: React.FC = () => {
         if (storedSessionId) {
           // If we have a stored session, fetch its history
           setSessionId(storedSessionId);
-          const historyResponse = await fetch(`http://localhost:8000/api/session/chat_history/${storedSessionId}`);
+          const historyResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/session/chat_history/${storedSessionId}`);
           const historyData = await historyResponse.json();
           
           if (historyData.messages && historyData.messages.length > 0) {
@@ -56,7 +56,7 @@ const ChatContainer: React.FC = () => {
         }
         
         // If no stored session or no history, create new session
-        const response = await fetch("http://localhost:8000/api/session/new_session/");
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/session/new_session/`);
         const data = await response.json();
         setSessionId(data.session_id);
         localStorage.setItem('chatSessionId', data.session_id);
@@ -93,7 +93,7 @@ const ChatContainer: React.FC = () => {
     setIsTyping(true);
     
     // Save message to backend in background
-    fetch(`http://localhost:8000/api/session/chat_message/${sessionId}`, {
+    fetch(`${import.meta.env.VITE_API_URL}/api/session/chat_message/${sessionId}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -109,7 +109,7 @@ const ChatContainer: React.FC = () => {
 
 
     try {
-      const response = await fetch("http://localhost:8000/api/chat", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text, session_id: sessionId }),
@@ -127,7 +127,7 @@ const ChatContainer: React.FC = () => {
 
       // Save bot message to backend
       try {
-        await fetch(`http://localhost:8000/api/session/chat_message/${sessionId}`, {
+        await fetch(`${import.meta.env.VITE_API_URL}/api/session/chat_message/${sessionId}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -165,14 +165,14 @@ const ChatContainer: React.FC = () => {
 
     try {
       // Reset backend in background
-      fetch(`http://localhost:8000/api/session/reset/${sessionId}`, {
+      fetch(`${import.meta.env.VITE_API_URL}/api/session/reset/${sessionId}`, {
         method: 'POST',
       }).catch(error => {
         console.error('Error resetting chat history:', error);
       });
 
       // Create new session
-      const response = await fetch("http://localhost:8000/api/session/new_session/");
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/session/new_session/`);
       const data = await response.json();
       setSessionId(data.session_id);
       localStorage.setItem('chatSessionId', data.session_id);
