@@ -82,31 +82,31 @@ const ChatContainer: React.FC = () => {
   const handleSendMessage = async (text: string) => {
     if (!text.trim() || !sessionId) return;
     
-    // Save message to backend
-    try {
-      await fetch(`http://localhost:8000/api/session/chat_message/${sessionId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          role: 'user',
-          content: text,
-        }),
-      });
-    } catch (error) {
-      console.error('Error saving message:', error);
-    }
-
+    // Immediately display user message
     const userMessage: Message = {
       id: Date.now().toString(),
       text,
       sender: "user",
       timestamp: new Date(),
     };
-
     setMessages((prev) => [...prev, userMessage]);
     setIsTyping(true);
+    
+    // Save message to backend in background
+    fetch(`http://localhost:8000/api/session/chat_message/${sessionId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        role: 'user',
+        content: text,
+      }),
+    }).catch(error => {
+      console.error('Error saving message:', error);
+    });
+
+
 
     try {
       const response = await fetch("http://localhost:8000/api/chat", {
@@ -152,22 +152,24 @@ const ChatContainer: React.FC = () => {
   const handleReset = async () => {
     if (!sessionId) return;
 
-    try {
-      // Call backend to reset chat history
-      await fetch(`http://localhost:8000/api/session/reset/${sessionId}`, {
-        method: 'POST',
-      });
+    // Immediately reset frontend state
+    setMessages([
+      {
+        id: "1",
+        text: "Hello! How can I help you today?",
+        sender: "bot",
+        timestamp: new Date(),
+        context: [],
+      },
+    ]);
 
-      // Reset frontend state
-      setMessages([
-        {
-          id: "1",
-          text: "Hello! How can I help you today?",
-          sender: "bot",
-          timestamp: new Date(),
-          context: [],
-        },
-      ]);
+    try {
+      // Reset backend in background
+      fetch(`http://localhost:8000/api/session/reset/${sessionId}`, {
+        method: 'POST',
+      }).catch(error => {
+        console.error('Error resetting chat history:', error);
+      });
 
       // Create new session
       const response = await fetch("http://localhost:8000/api/session/new_session/");
@@ -175,7 +177,7 @@ const ChatContainer: React.FC = () => {
       setSessionId(data.session_id);
       localStorage.setItem('chatSessionId', data.session_id);
     } catch (error) {
-      console.error('Error resetting chat:', error);
+      console.error('Error creating new session:', error);
     }
   };
 
