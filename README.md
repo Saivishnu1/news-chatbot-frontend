@@ -2,6 +2,12 @@
 
 A modern React-based frontend for an AI-powered news chatbot. This application provides an intuitive interface for users to interact with a chatbot that can answer questions about news articles using RAG (Retrieval Augmented Generation) technology.
 
+## Hosted Webservice URLs:-
+
+https://news-chatbot-frontend.onrender.com/
+
+**Note**:- The hosted server might be sleeping due to inactivity. It needs 30-60 seconds to start running.
+
 ## Features
 
 - 💬 Real-time chat interface
